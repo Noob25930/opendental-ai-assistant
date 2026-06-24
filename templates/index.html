@@ -310,6 +310,66 @@
     .layout { grid-template-columns: 1fr; }
     .stats { grid-template-columns: repeat(2, 1fr); }
   }
+
+  /* Two-column operatory layout */
+  .op-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+    align-items: start;
+  }
+
+  .op-card {
+    border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 16px;
+    overflow: hidden;
+    background: rgba(255,255,255,0.75);
+  }
+
+  .op-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+    background: rgba(0,0,0,0.035);
+  }
+
+  .op-title {
+    font-size: 1.05rem;
+    font-weight: 800;
+  }
+
+  .op-count {
+    font-size: 0.85rem;
+    opacity: 0.75;
+    white-space: nowrap;
+  }
+
+  .op-body {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .op-card .apt-item {
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+    border-top: 0;
+    margin: 0;
+  }
+
+  .op-card .apt-item:last-child {
+    border-bottom: 0;
+  }
+
+  @media (max-width: 900px) {
+    .op-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
 </style>
 </head>
 <body>
@@ -583,39 +643,77 @@ function renderList(apts, today) {
 
   list.innerHTML = '';
 
+  // Group appointments by operatory
+  const rooms = {};
   apts.forEach(a => {
-    const missed  = brokenHistory[a.PatNum] || 0;
-    const bday    = isBirthday(a, today);
-    const time    = formatTime(a.AptDateTime);
-    const phone   = a.WirelessPhone || a.HmPhone || '';
-    const room    = a.OperatoryName || `Op ${a.OperatoryNum}`;
-    const prov    = providerName(a);
-    const note    = (a.Note || '').replace(/\r\n|\n/g, ' ').trim();
+    const room = a.OperatoryName || `Op ${a.OperatoryNum}`;
+    if (!rooms[room]) rooms[room] = [];
+    rooms[room].push(a);
+  });
 
-    const item = document.createElement('div');
-    item.className = 'apt-item';
+  // Sort operatories alphabetically/numerically
+  const sortedRooms = Object.keys(rooms).sort((a, b) =>
+    a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+  );
 
-    item.innerHTML = `
-      <div class="apt-time">
-        ${time}
-        <div class="room">${room}</div>
-      </div>
-      <div class="apt-main">
-        <div class="name">${a.PatFName} ${a.PatLName}</div>
-        <div class="proc">${a.ProcDescript || '—'}</div>
-        ${phone ? `<div class="phone">📞 ${phone}</div>` : ''}
-        ${note  ? `<div class="note">${note}</div>` : ''}
-      </div>
-      <div class="apt-badges">
-        <span class="badge badge-prov">${prov}</span>
-        ${a.IsNewPatient ? '<span class="badge badge-new">🆕 New</span>' : ''}
-        ${missed >= 2    ? `<span class="badge badge-risk">⚠️ ${missed} missed</span>` : ''}
-        ${bday           ? '<span class="badge badge-bday">🎂 Birthday</span>' : ''}
-      </div>
+  // Main two-column grid
+  const grid = document.createElement('div');
+  grid.className = 'op-grid';
+
+  sortedRooms.forEach(roomName => {
+    const roomCard = document.createElement('div');
+    roomCard.className = 'op-card';
+
+    const roomHeader = document.createElement('div');
+    roomHeader.className = 'op-header';
+    roomHeader.innerHTML = `
+      <div class="op-title">${roomName}</div>
+      <div class="op-count">${rooms[roomName].length} appt${rooms[roomName].length === 1 ? '' : 's'}</div>
     `;
 
-    list.appendChild(item);
+    const roomBody = document.createElement('div');
+    roomBody.className = 'op-body';
+
+    rooms[roomName].forEach(a => {
+      const missed  = brokenHistory[a.PatNum] || 0;
+      const bday    = isBirthday(a, today);
+      const time    = formatTime(a.AptDateTime);
+      const phone   = a.WirelessPhone || a.HmPhone || '';
+      const room    = a.OperatoryName || `Op ${a.OperatoryNum}`;
+      const prov    = providerName(a);
+      const note    = (a.Note || '').replace(/\r\n|\n/g, ' ').trim();
+
+      const item = document.createElement('div');
+      item.className = 'apt-item';
+
+      item.innerHTML = `
+        <div class="apt-time">
+          ${time}
+          <div class="room">${room}</div>
+        </div>
+        <div class="apt-main">
+          <div class="name">${a.PatFName} ${a.PatLName}</div>
+          <div class="proc">${a.ProcDescript || '—'}</div>
+          ${phone ? `<div class="phone">📞 ${phone}</div>` : ''}
+          ${note  ? `<div class="note">${note}</div>` : ''}
+        </div>
+        <div class="apt-badges">
+          <span class="badge badge-prov">${prov}</span>
+          ${a.IsNewPatient ? '<span class="badge badge-new">🆕 New</span>' : ''}
+          ${missed >= 2    ? `<span class="badge badge-risk">⚠️ ${missed} missed</span>` : ''}
+          ${bday           ? '<span class="badge badge-bday">🎂 Birthday</span>' : ''}
+        </div>
+      `;
+
+      roomBody.appendChild(item);
+    });
+
+    roomCard.appendChild(roomHeader);
+    roomCard.appendChild(roomBody);
+    grid.appendChild(roomCard);
   });
+
+  list.appendChild(grid);
 }
 
 function updateStats(apts, broken, today) {

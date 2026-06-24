@@ -102,6 +102,7 @@ def _get_connection() -> mysql.connector.connection.MySQLConnection:
             connect_timeout=10,
             charset="utf8",
             use_unicode=True,
+            ssl_disabled=True,
         )
         logger.info(
             "MySQL connection established: %s@%s/%s",
